@@ -1,0 +1,76 @@
+{
+  "id": "errorHandlerWf001",
+  "name": "Error Handler - email ke admin",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Workflow gagal",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rp = (n) => 'Rp ' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\nconst from = { Email: 'toko@wander.test', Name: 'Shop' };\nconst e = $input.first().json;\nconst err = (e.execution && e.execution.error) || {};\nreturn [{ json: { From: from, To: [{ Email: 'admin@wander.test', Name: 'Admin' }],\n  Subject: '[n8n ERROR] ' + ((e.workflow && e.workflow.name) || 'workflow'),\n  Text: 'Workflow \"' + ((e.workflow && e.workflow.name) || '?') + '\" gagal.\\n\\n'\n    + 'Node terakhir: ' + ((e.execution && e.execution.lastNodeExecuted) || '-') + '\\n'\n    + 'Pesan: ' + (err.message || '-') + '\\n'\n    + 'Eksekusi: ' + ((e.execution && e.execution.url) || '-') } }];"
+      },
+      "id": "code-format-error",
+      "name": "Susun email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mailpit:8025/api/v1/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "send-Kirim email (Mailpit)",
+      "name": "Kirim email (Mailpit)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Workflow gagal": {
+      "main": [
+        [
+          {
+            "node": "Susun email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Susun email": {
+      "main": [
+        [
+          {
+            "node": "Kirim email (Mailpit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

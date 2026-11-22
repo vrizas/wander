@@ -1,0 +1,82 @@
+{
+  "id": "orderPaidWf0001",
+  "name": "Order Paid - notifikasi",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "errorHandlerWf001"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-paid",
+        "options": {}
+      },
+      "id": "wh-order-paid",
+      "name": "Webhook order.paid",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "order-paid-hook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rp = (n) => 'Rp ' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\nconst from = { Email: 'toko@wander.test', Name: 'Shop' };\nconst { data } = $input.first().json.body;\nconst lines = data.items.map((i) => '- ' + i.name + ' x' + i.quantity + ' = ' + rp(i.price * i.quantity)).join('\\n');\nconst detail = lines + '\\nOngkir: ' + rp(data.shippingCost) + '\\nTotal: ' + rp(data.total);\nreturn [\n  { json: { From: from, To: [{ Email: data.customer.email, Name: data.customer.name }],\n    Subject: 'Pembayaran diterima - ' + data.code,\n    Text: 'Halo ' + data.customer.name + ',\\n\\nPembayaran untuk pesanan ' + data.code + ' sudah kami terima.\\n\\n' + detail + '\\n\\nDikirim ke: ' + data.shippingAddress + '\\n\\nTerima kasih!' } },\n  { json: { From: from, To: [{ Email: 'admin@wander.test', Name: 'Admin' }],\n    Subject: '[Order PAID] ' + data.code + ' - ' + rp(data.total),\n    Text: 'Order ' + data.code + ' dari ' + data.customer.name + ' (' + data.customer.email + ') sudah lunas.\\n\\n' + detail + '\\n\\nAlamat: ' + data.shippingAddress } },\n];"
+      },
+      "id": "code-format-order",
+      "name": "Susun email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mailpit:8025/api/v1/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "send-Kirim email (Mailpit)",
+      "name": "Kirim email (Mailpit)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook order.paid": {
+      "main": [
+        [
+          {
+            "node": "Susun email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Susun email": {
+      "main": [
+        [
+          {
+            "node": "Kirim email (Mailpit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

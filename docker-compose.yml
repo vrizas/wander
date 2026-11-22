@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-javamifi}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-javamifi}
+      POSTGRES_DB: ${DB_NAME:-javamifi}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5679:5678"
+    environment:
+      GENERIC_TIMEZONE: Asia/Jakarta
+      TZ: Asia/Jakarta
+      N8N_SECURE_COOKIE: "false"
+      WEBHOOK_URL: http://localhost:5679/
+      API_URL: http://host.docker.internal:${PORT:-3001}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      N8N_API_KEY: ${N8N_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8ndata:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+volumes:
+  pgdata:
+  n8ndata:

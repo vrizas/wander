@@ -1,0 +1,149 @@
+{
+  "id": "reconcileWf00001",
+  "name": "Reconcile Payments - sinkron status Midtrans",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "errorHandlerWf001"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-reconcile",
+      "name": "Setiap jam",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reconcile-payments",
+        "options": {}
+      },
+      "id": "wh-reconcile",
+      "name": "Webhook (jalankan manual)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        120
+      ],
+      "webhookId": "reconcile-hook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_URL }}/api/internal/reconcile-payments",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-reconcile",
+      "name": "Panggil API rekonsiliasi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rp = (n) => 'Rp ' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\nconst from = { Email: 'toko@wander.test', Name: 'Shop' };\nconst r = $input.first().json;\nconst updated = r.updated ?? [];\nconst errors = r.errors ?? [];\nif (!updated.length && !errors.length) return []; // tidak ada yang perlu dikabarkan\nconst lines = [];\nif (updated.length) lines.push('Order yang disinkronkan dengan Midtrans:', ...updated.map((u) => '- ' + u.code + ': ' + u.from + ' -> ' + u.to));\nif (errors.length) lines.push('', 'Gagal diperiksa:', ...errors.map((e) => '- ' + e.code + ': ' + e.message));\nlines.push('', 'Dicek: ' + r.checked + ', dilewati (belum ada transaksi): ' + r.skipped);\nreturn [{ json: { From: from, To: [{ Email: 'admin@wander.test', Name: 'Admin' }],\n  Subject: '[Rekonsiliasi] ' + updated.length + ' order diperbarui' + (errors.length ? ', ' + errors.length + ' gagal' : ''),\n  Text: lines.join('\\n') } }];"
+      },
+      "id": "code-format-reconcile",
+      "name": "Susun email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mailpit:8025/api/v1/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "send-Kirim email (Mailpit)",
+      "name": "Kirim email (Mailpit)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Setiap jam": {
+      "main": [
+        [
+          {
+            "node": "Panggil API rekonsiliasi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (jalankan manual)": {
+      "main": [
+        [
+          {
+            "node": "Panggil API rekonsiliasi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Panggil API rekonsiliasi": {
+      "main": [
+        [
+          {
+            "node": "Susun email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Susun email": {
+      "main": [
+        [
+          {
+            "node": "Kirim email (Mailpit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

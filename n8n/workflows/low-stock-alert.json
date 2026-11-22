@@ -1,0 +1,139 @@
+{
+  "id": "lowStockWf00001",
+  "name": "Low Stock - alert harian",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "errorHandlerWf001"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-low-stock",
+      "name": "Setiap hari 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "low-stock-check",
+        "options": {}
+      },
+      "id": "wh-low-stock",
+      "name": "Webhook (jalankan manual)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        120
+      ],
+      "webhookId": "low-stock-hook"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.API_URL }}/api/products?lowStock=true",
+        "options": {}
+      },
+      "id": "http-products",
+      "name": "Ambil produk stok rendah",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rp = (n) => 'Rp ' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\nconst from = { Email: 'toko@wander.test', Name: 'Shop' };\nconst items = $input.first().json.items ?? [];\nif (!items.length) return [];\nreturn [{ json: { From: from, To: [{ Email: 'admin@wander.test', Name: 'Admin' }],\n  Subject: '[Stok menipis] ' + items.length + ' produk perlu restock',\n  Text: items.map((p) => '- ' + p.name + ': sisa ' + p.stock).join('\\n') } }];"
+      },
+      "id": "code-format-stock",
+      "name": "Susun email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mailpit:8025/api/v1/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "send-Kirim email (Mailpit)",
+      "name": "Kirim email (Mailpit)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Setiap hari 08:00": {
+      "main": [
+        [
+          {
+            "node": "Ambil produk stok rendah",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (jalankan manual)": {
+      "main": [
+        [
+          {
+            "node": "Ambil produk stok rendah",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil produk stok rendah": {
+      "main": [
+        [
+          {
+            "node": "Susun email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Susun email": {
+      "main": [
+        [
+          {
+            "node": "Kirim email (Mailpit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

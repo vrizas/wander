@@ -1,0 +1,82 @@
+{
+  "id": "paymentFailedWf001",
+  "name": "Payment Failed - email ke customer",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "errorHandlerWf001"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-failed",
+        "options": {}
+      },
+      "id": "wh-payment-failed",
+      "name": "Webhook payment.failed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "payment-failed-hook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rp = (n) => 'Rp ' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\nconst from = { Email: 'toko@wander.test', Name: 'Shop' };\nconst { data } = $input.first().json.body;\nconst msg = {\n  denied: { subject: 'Pembayaran ditolak', body: 'Pembayaran untuk pesanan ' + data.code + ' ditolak oleh bank/penyedia pembayaran. Pesanan Anda masih menunggu pembayaran, silakan coba lagi dengan metode lain.' },\n  expired: { subject: 'Pesanan kedaluwarsa', body: 'Batas waktu pembayaran pesanan ' + data.code + ' sudah habis. Pesanan dibatalkan dan stok dikembalikan. Silakan pesan ulang jika masih berminat.' },\n  cancelled: { subject: 'Pesanan dibatalkan', body: 'Pembayaran pesanan ' + data.code + ' dibatalkan, sehingga pesanan ikut dibatalkan dan stok dikembalikan.' },\n}[data.reason] || { subject: 'Pembayaran bermasalah', body: 'Ada masalah pada pembayaran pesanan ' + data.code + '.' };\nconst items = data.items.map((i) => '- ' + i.name + ' x' + i.quantity).join('\\n');\nreturn [{ json: { From: from, To: [{ Email: data.customer.email, Name: data.customer.name }],\n  Subject: msg.subject + ' - ' + data.code,\n  Text: 'Halo ' + data.customer.name + ',\\n\\n' + msg.body + '\\n\\n' + items + '\\nTotal: ' + rp(data.total) + '\\n\\nLihat pesanan: ' + data.orderUrl } }];"
+      },
+      "id": "code-format-failed",
+      "name": "Susun email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mailpit:8025/api/v1/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "send-Kirim email (Mailpit)",
+      "name": "Kirim email (Mailpit)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook payment.failed": {
+      "main": [
+        [
+          {
+            "node": "Susun email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Susun email": {
+      "main": [
+        [
+          {
+            "node": "Kirim email (Mailpit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
