@@ -51,7 +51,7 @@ model Product {
   name        String
   slug        String      @unique
   description String      @default("")
-  price       Int // dalam Rupiah (tanpa desimal)
+  price       Int
   stock       Int         @default(0)
   imageUrl    String?
   isActive    Boolean     @default(true)
@@ -66,7 +66,7 @@ model Product {
 
 model Order {
   id              String      @id @default(cuid())
-  code            String      @unique // dipakai sebagai order_id di Midtrans
+  code            String      @unique
   userId          String
   user            User        @relation(fields: [userId], references: [id])
   status          OrderStatus @default(PENDING)
@@ -89,8 +89,8 @@ model OrderItem {
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
   product   Product @relation(fields: [productId], references: [id])
-  name      String // snapshot nama saat checkout
-  price     Int // snapshot harga saat checkout
+  name      String
+  price     Int
   quantity  Int
 
   @@index([orderId])
